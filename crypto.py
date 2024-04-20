@@ -1,4 +1,3 @@
-# cryptography_utils.py
 
 from cryptography.fernet import Fernet
 import paramiko
@@ -28,21 +27,92 @@ def odszyfrowanieTekstuKluczSymmetric(zaszyfrowanyTekst, key_hex):
     return odszyfrowanyTekst
 
 def generowanieAsymmetricKeypair():
-    """Generwoanie asymetrycznego klucza publicznego i prywatnego"""
+    """Generowanie asymetrycznej pary kluczy"""
     kluczPrywatny = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
         backend=default_backend()
     )
     kluczPubliczny = kluczPrywatny.public_key()
-    kluczPrywatnyHex = kluczPrywatny.private_bytes(
+    kluczPrywatnyPem = kluczPrywatny.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption()
-    ).hex()
-    kluczPublicznyHex = kluczPubliczny.public_bytes(
+    )
+    kluczPublicznyPem = kluczPubliczny.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
-    ).hex()
+    )
+    kluczPrywatnyHex = kluczPrywatnyPem.hex()
+    kluczPublicznyHex = kluczPublicznyPem.hex()
     return kluczPrywatnyHex, kluczPublicznyHex
+
+def generujPodpisWiadomosci(message, private_key_hex):
+    """Generuje podpis wiadomości za pomocą klucza prywatnego."""
+    private_key = serialization.load_pem_private_key(
+        bytes.fromhex(private_key_hex),
+        password=None,
+        backend=default_backend()
+    )
+    podpis = private_key.sign(
+        message.encode(),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return podpis.hex()
+
+
+def generujPodpisKluczaPrywatnego(message, private_key_hex):
+    """Generuje podpis wiadomości za pomocą klucza prywatnego."""
+    private_key = serialization.load_pem_private_key(
+        bytes.fromhex(private_key_hex),
+        password=None,
+        backend=default_backend()
+    )
+    podpis = private_key.sign(
+        message.encode(),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return podpis.hex()
+
+def szyfrujWiadomoscKluczemPublicznym(message, kluczPublicznyHex):
+    """Szyfruje wiadomość za pomocą klucza publicznego."""
+    kluczPubliczny = serialization.load_pem_public_key(
+        bytes.fromhex(kluczPublicznyHex),
+        default_backend()
+    )
+    zaszyfrowanaWiadomosc = kluczPubliczny.encrypt(
+        message.encode(),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return zaszyfrowanaWiadomosc.hex()
+
+def deszyfrujWiadomoscKluczemPrywatnym(encryptedMessage, kluczPrywatnyHex):
+    """Deszyfruje wiadomość za pomocą klucza prywatnego."""
+    kluczPrywatny = serialization.load_pem_private_key(
+        bytes.fromhex(kluczPrywatnyHex),
+        password=None,
+        backend=default_backend()
+    )
+    odszyfrowanaWiadomosc = kluczPrywatny.decrypt(
+        bytes.fromhex(encryptedMessage),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    return odszyfrowanaWiadomosc.decode()
+
     
